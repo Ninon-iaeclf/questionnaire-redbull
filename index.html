@@ -122,15 +122,20 @@ const num = n => { const s = document.querySelector(`input[name="${n}"]`).value.
   const x = Number(s); return s === "" || isNaN(x) ? null : x; };
 
 const VW = ["vw_trop_bon_marche", "vw_bon_marche", "vw_cher", "vw_trop_cher"];
-// Échelles de Likert, 3 items par concept (adaptées de Wu et al. 2012, Tian et al. 2001, Dodds et al. 1991)
+// Échelles de Likert, 3 items par concept
+// Page 1 : concepts du Marketing Scales Handbook vol. 10 (Bruner 2019), items adaptés en français
 const LK_PAGE_1 = [
-  ["rar_1", "Cette boisson ne sera disponible que pendant une courte période."],   // rareté perçue
-  ["rar_2", "Cette boisson risque d'être difficile à trouver."],
-  ["rar_3", "Cette boisson risque d'être rapidement épuisée."],
-  ["exc_1", "Boire cette boisson me permettrait de me démarquer des autres."],     // exclusivité perçue
-  ["exc_2", "Cette boisson a quelque chose de spécial."],
-  ["exc_3", "Cette boisson me paraît exclusive."],
+  ["pf_1", "Payer plus cher pour cette boisson me paraîtrait justifié."],                              // Price Fairness (p. 315)
+  ["pf_2", "Un prix plus élevé que celui d'une Red Bull classique serait raisonnable pour cette boisson."],
+  ["pf_3", "Je trouverais normal que cette boisson coûte plus cher."],
+  ["wtpm_1", "Je serais prêt(e) à payer plus cher pour cette boisson que pour une Red Bull classique."], // Willingness to Pay More (p. 513)
+  ["wtpm_2", "Cette boisson vaut la peine de dépenser un peu plus."],
+  ["wtpm_3", "Je paierais volontiers quelques centimes de plus pour l'avoir."],
+  ["ant_1", "J'ai hâte de goûter cette boisson."],                                                     // Anticipation (Affective) (p. 8)
+  ["ant_2", "L'idée de goûter cette boisson me rend curieux(se)."],
+  ["ant_3", "Je serais excité(e) de l'essayer dès sa sortie."],
 ];
+// Page 2 : adaptées de Dodds, Monroe & Grewal (1991)
 const LK_PAGE_2 = [
   ["val_1", "Pour ce qu'elle offre, cette boisson vaut son prix."],                // valeur perçue
   ["val_2", "Acheter cette boisson serait une bonne affaire."],
@@ -155,23 +160,31 @@ const steps = [
     html: () => `<h1>Votre avis sur une nouvelle boisson énergisante</h1>
       <p>Dans le cadre d'un projet de Master 1 Marketing à l'IAE Clermont Auvergne, nous étudions l'avis des
       consommateurs sur une nouvelle boisson énergisante.</p>
-      <p>Le questionnaire prend environ <strong>4 minutes</strong>. Il est <strong>anonyme</strong> : nous ne
+      <p>Le questionnaire prend environ <strong>5 minutes</strong>. Il est <strong>anonyme</strong> : nous ne
       demandons ni nom, ni adresse e-mail. Les réponses servent uniquement à ce projet d'étude.</p>
       <div class="q">${radios("consent", [["oui", "J'accepte de participer"], ["non", "Je ne souhaite pas participer"]])}</div>`,
     check: () => val("consent") ? null : "Merci de choisir une réponse.",
     save: () => { data.consent = val("consent"); return data.consent === "oui" ? null : "refus"; },
   },
-  { // 2. Âge (bloque les moins de 18 ans) + fréquence Red Bull (variable de contrôle)
+  { // 2. Âge (bloque les moins de 18 ans), lieu de résidence, fréquence Red Bull, lieu d'achat (variables de contrôle)
     html: () => `<h2>Pour commencer</h2>
       ${field("age", "Quel âge avez-vous ?", "ans")}
+      <div class="q"><span class="title">Vous habitez :</span>
+      ${radios("residence", [["grande_ville","Dans une grande ville (plus de 100 000 habitants)"],["ville_moyenne","Dans une ville moyenne (de 20 000 à 100 000 habitants)"],
+        ["petite_ville","Dans une petite ville (de 2 000 à 20 000 habitants)"],["campagne","À la campagne ou dans un village (moins de 2 000 habitants)"]])}</div>
       <div class="q"><span class="title">À quelle fréquence buvez-vous du Red Bull ?</span>
-      ${radios("frequence_redbull", [["jamais","Jamais"],["<1/mois","Moins d'une fois par mois"],["1-3/mois","1 à 3 fois par mois"],["1-3/sem","1 à 3 fois par semaine"],["4+/sem","4 fois par semaine ou plus"]])}</div>`,
+      ${radios("frequence_redbull", [["jamais","Jamais"],["<1/mois","Moins d'une fois par mois"],["1-3/mois","1 à 3 fois par mois"],["1-3/sem","1 à 3 fois par semaine"],["4+/sem","4 fois par semaine ou plus"]])}</div>
+      <div class="q"><span class="title">Où achetez-vous le plus souvent vos boissons énergisantes ?</span>
+      ${radios("lieu_achat", [["supermarche","En supermarché ou hypermarché"],["proximite","En supérette, épicerie de proximité ou épicerie de nuit"],
+        ["station","En station-service"],["distributeur","Dans un distributeur automatique"],["bar","Dans un bar, une boîte de nuit ou un restaurant"],
+        ["en_ligne","En ligne"],["aucun","Je n'en achète pas"]])}</div>`,
     check: () => {
       const a = num("age");
       if (a === null || !Number.isInteger(a) || a < 10 || a > 99) return "Merci d'indiquer votre âge en chiffres (ex : 21).";
-      return val("frequence_redbull") ? null : "Merci d'indiquer à quelle fréquence vous buvez du Red Bull.";
+      return ["residence", "frequence_redbull", "lieu_achat"].every(val) ? null : "Merci de répondre à chaque question.";
     },
-    save: () => { data.age = num("age"); data.frequence_redbull = val("frequence_redbull");
+    save: () => { data.age = num("age");
+      ["residence", "frequence_redbull", "lieu_achat"].forEach(k => data[k] = val(k));
       return data.age >= 18 ? null : "mineur"; },
   },
   { // 3 + 4a. Offre + Van Westendorp
