@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Étude boisson énergisante</title>
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #ffffff; --text: #1c2233; --muted: #5d6680;
+    --accent: #1e3a8a; --accent-2: #d7263d; --border: #d9deea; --ok: #e8f0ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+  h1 { font-size: 1.35rem; margin: 0 0 12px; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); font-size: .92rem; }
+  .progress { height: 6px; background: var(--border); border-radius: 3px; margin-bottom: 16px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .q { margin: 20px 0; }
+  .q > label.title, .q > .title { display: block; font-weight: 600; margin-bottom: 8px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border);
+         border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+  .opt:has(input:checked) { background: var(--ok); border-color: var(--accent); }
+  .opt input { margin-top: 4px; }
+  .euro { display: flex; align-items: center; gap: 8px; }
+  .euro input { width: 120px; padding: 10px; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row .opt { flex: 1 1 120px; margin-bottom: 0; }
+  .gg { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0;
+        border-bottom: 1px solid var(--border); }
+  .gg strong { min-width: 70px; }
+  .gg .row .opt { flex: 0 0 auto; }
+  .likert { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .likert .opt { flex-direction: column; align-items: center; text-align: center; font-size: .78rem; padding: 8px 4px; margin: 0; }
+  .likert .opt input { margin: 0; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 12px 22px;
+           font-size: 1rem; cursor: pointer; margin-top: 12px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .error { color: var(--accent-2); font-size: .92rem; margin-top: 8px; min-height: 1.2em; }
+  .warn { background: #fff6e0; border: 1px solid #f0c674; border-radius: 10px; padding: 12px; margin-top: 12px; }
+
+  /* La présentation de l'offre */
+  .offer { display: flex; gap: 20px; align-items: center; margin: 8px 0 16px; }
+  .offer svg { flex: 0 0 110px; }
+  .offer ul { margin: 0; padding-left: 18px; }
+  .badge { display: inline-block; background: var(--accent-2); color: #fff; font-weight: 700; font-size: .85rem;
+           letter-spacing: .04em; border-radius: 6px; padding: 4px 10px; margin-bottom: 8px; }
+  @media (max-width: 480px) {
+    .offer { flex-direction: column; text-align: left; align-items: flex-start; }
+    .gg { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="progress"><div id="bar"></div></div>
+  <div class="card" id="app"></div>
+  <p class="muted" style="text-align:center;margin-top:16px">
+    Étude universitaire — M1 Marketing, IAE Clermont Auvergne. Non affiliée à la marque Red Bull.
+  </p>
+</main>
+
+<script>
+/* ============ À MODIFIER ============ */
+// Colle ici l'URL de ton Google Apps Script (voir GUIDE.md, étape 2)
+const ENDPOINT = "https://script.google.com/macros/s/AKfycbwlNLkGrs3qWfcl9JCGWRdgwTL-5FesFIFFfp4D6ecDnkA0w4U19MPGRESTkUOx7nTT/exec";
+// Prix proposés dans Gabor-Granger, du plus cher au moins cher (même ordre pour tous)
+const GG_PRICES = [1.95, 1.75, 1.60, 1.45, 1.30, 1.15];
+/* ==================================== */
+
+const fmt = p => p.toFixed(2).replace(".", ",") + " €";
+const ggKey = p => "gg_" + p.toFixed(2).replace(".", "_");
+
+// --- Tirage au sort A/B, fait à l'ouverture, gardé si la page est rechargée ---
+const params = new URLSearchParams(location.search);
+let version = params.get("v");               // ?v=A ou ?v=B pour tester une version précise
+const isTest = version === "A" || version === "B";
+if (!isTest) {
+  try { version = sessionStorage.getItem("version"); } catch (e) {}
+  if (version !== "A" && version !== "B") {
+    version = Math.random() < 0.5 ? "A" : "B";
+    try { sessionStorage.setItem("version", version); } catch (e) {}
+  }
+}
+
+const data = {
+  id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).slice(0, 8),
+  version, test: isTest ? 1 : 0, statut: "en_cours",
+};
+const start = Date.now();
+
+// --- L'offre : A et B identiques, sauf le bloc « édition limitée » ---
+function canSvg() {
+  return `<svg width="110" height="200" viewBox="0 0 110 200" aria-hidden="true">
+    <defs><linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#c9ced8"/><stop offset=".5" stop-color="#ffffff"/><stop offset="1" stop-color="#aab1be"/>
+    </linearGradient></defs>
+    <rect x="10" y="12" width="90" height="180" rx="12" fill="url(#g)" stroke="#8a93a6"/>
+    <rect x="18" y="4" width="74" height="12" rx="4" fill="#b8bec9"/>
+    <rect x="10" y="60" width="90" height="70" fill="#b3122e"/>
+    <text x="55" y="90" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Red Bull</text>
+    <text x="55" y="108" text-anchor="middle" font-size="10" fill="#fff">SUGARFREE</text>
+    <text x="55" y="122" text-anchor="middle" font-size="9" fill="#ffd6dc">pomme d'amour</text>
+    <circle cx="55" cy="160" r="10" fill="#d7263d"/><rect x="54" y="146" width="2" height="6" fill="#6b3d1f"/>
+  </svg>`;
+}
+function offerHtml() {
+  const limited = version === "A"
+    ? `<span class="badge">WINTER EDITION · ÉDITION LIMITÉE</span>
+       <p><strong>Disponible uniquement cet hiver, en quantité limitée.</strong></p>`
+    : "";
+  return `<div class="offer">${canSvg()}<div>
+      ${limited}
+      <p><strong>Red Bull Sugarfree, goût pomme d'amour</strong></p>
+      <ul>
+        <li>Canette de 25 cl</li>
+        <li>Sans sucres</li>
+        <li>Goût pomme d'amour : pomme rouge et caramel</li>
+        <li>Même teneur en caféine qu'une Red Bull classique</li>
+      </ul>
+    </div></div>`;
+}
+
+// --- Petits constructeurs de questions ---
+const radios = (name, opts, cls = "") => `<div class="${cls}">` + opts.map(([v, l]) =>
+  `<label class="opt"><input type="radio" name="${name}" value="${v}"><span>${l}</span></label>`).join("") + "</div>";
+const euro = (name, label) => `<div class="q"><label class="title" for="${name}">${label}</label>
+  <div class="euro"><input id="${name}" name="${name}" type="text" inputmode="decimal" placeholder="ex : 1,50"> €</div></div>`;
+const LIKERT = [["1","Pas du tout d'accord"],["2","Plutôt pas d'accord"],["3","Ni d'accord ni pas d'accord"],["4","Plutôt d'accord"],["5","Tout à fait d'accord"]];
+
+const val = n => { const el = document.querySelector(`input[name="${n}"]:checked`); return el ? el.value : null; };
+const num = n => { const s = document.querySelector(`input[name="${n}"]`).value.trim().replace(",", ".").replace("€", "");
+  const x = parseFloat(s); return s === "" || isNaN(x) ? null : x; };
+
+// --- Les étapes du questionnaire ---
+let vwWarned = false;
+const steps = [
+  { // 1. Accueil
+    html: () => `<h1>Votre avis sur une nouvelle boisson énergisante</h1>
+      <p>Dans le cadre d'un projet de Master 1 Marketing à l'IAE Clermont Auvergne, nous étudions le prix
+      qu'une nouvelle boisson énergisante pourrait avoir.</p>
+      <p>Le questionnaire prend environ <strong>3 minutes</strong>. Il est <strong>anonyme</strong> : nous ne
+      demandons ni nom, ni adresse e-mail. Les réponses servent uniquement à ce projet d'étude.</p>
+      <div class="q">${radios("consent", [["oui", "J'accepte de participer"], ["non", "Je ne souhaite pas participer"]])}</div>`,
+    check: () => val("consent") ? null : "Merci de choisir une réponse.",
+    save: () => { data.consent = val("consent"); return data.consent === "oui" ? null : "refus"; },
+  },
+  { // 2. Filtre
+    html: () => `<h2>Quelques questions avant de commencer</h2>
+      <div class="q"><span class="title">Avez-vous 18 ans ou plus ?</span>${radios("majeur", [["oui","Oui"],["non","Non"]], "row")}</div>
+      <div class="q"><span class="title">Au cours des 12 derniers mois, avez-vous bu au moins une boisson énergisante
+      (Red Bull, Monster, Burn…) ?</span>${radios("filtre", [["oui","Oui"],["non","Non"]], "row")}</div>`,
+    check: () => val("majeur") && val("filtre") ? null : "Merci de répondre aux deux questions.",
+    save: () => { data.majeur = val("majeur"); data.filtre_conso = val("filtre");
+      return data.majeur === "oui" && data.filtre_conso === "oui" ? null : "hors_cible"; },
+  },
+  { // 3 + 4a. Offre + Van Westendorp
+    html: () => `<h2>Découvrez cette boisson</h2>
+      <p class="muted">Lisez attentivement la présentation. Elle reste affichée pendant les questions.</p>
+      ${offerHtml()}
+      <p>Pour cette canette, indiquez un prix en euros :</p>
+      ${euro("vw_trop_bon_marche", "À partir de quel prix la trouveriez-vous <u>si bon marché</u> que vous douteriez de sa qualité ?")}
+      ${euro("vw_bon_marche", "À partir de quel prix la trouveriez-vous <u>bon marché</u>, une bonne affaire ?")}
+      ${euro("vw_cher", "À partir de quel prix la trouveriez-vous <u>chère</u>, mais en l'achetant quand même ?")}
+      ${euro("vw_trop_cher", "À partir de quel prix la trouveriez-vous <u>trop chère</u> pour l'acheter ?")}
+      <div id="vwwarn"></div>`,
+    check: () => {
+      const k = ["vw_trop_bon_marche","vw_bon_marche","vw_cher","vw_trop_cher"], v = k.map(num);
+      if (v.some(x => x === null)) return "Merci d'indiquer un prix pour chaque question (ex : 1,50).";
+      if (v.some(x => x < 0 || x > 50)) return "Merci d'indiquer un prix réaliste en euros.";
+      const ordered = v.every((x, i) => i === 0 || x >= v[i - 1]);
+      if (!ordered && !vwWarned) {
+        vwWarned = true;
+        document.getElementById("vwwarn").innerHTML = `<div class="warn">Vos prix ne vont pas du moins cher au plus cher.
+          Vérifiez vos réponses, ou cliquez à nouveau sur « Suivant » pour les garder telles quelles.</div>`;
+        return "";
+      }
+      return null;
+    },
+    save: () => { ["vw_trop_bon_marche","vw_bon_marche","vw_cher","vw_trop_cher"].forEach(k => data[k] = num(k)); },
+  },
+  { // 4b. Gabor-Granger
+    html: () => `<h2>À quel prix l'achèteriez-vous ?</h2>
+      ${offerHtml()}
+      <p>Pour chaque prix, achèteriez-vous cette canette ?</p>
+      ${GG_PRICES.map(p => `<div class="gg"><strong>${fmt(p)}</strong>
+        ${radios(ggKey(p), [["1","Oui, je l'achèterais"],["0","Non"]], "row")}</div>`).join("")}`,
+    check: () => GG_PRICES.every(p => val(ggKey(p))) ? null : "Merci de répondre pour chaque prix.",
+    save: () => { GG_PRICES.forEach(p => data[ggKey(p)] = Number(val(ggKey(p)))); },
+  },
+  { // 5. Contrôle
+    html: () => `<h2>Une question sur ce que vous avez vu</h2>
+      <div class="q"><span class="title">Dans la présentation de la boisson, avez-vous vu la mention « édition limitée » ?</span>
+      ${radios("controle", [["oui","Oui"],["non","Non"],["ne_sait_pas","Je ne sais pas"]])}</div>`,
+    check: () => val("controle") ? null : "Merci de choisir une réponse.",
+    save: () => { data.controle = val("controle"); },
+  },
+  { // 6. Perception (Likert)
+    html: () => `<h2>Ce que vous en pensez</h2>
+      <p>Indiquez dans quelle mesure vous êtes d'accord avec chaque phrase.</p>
+      ${[["lk_originale","Cette boisson me paraît originale."],
+         ["lk_qualite","Cette boisson me paraît de bonne qualité."],
+         ["lk_envie","J'aurais envie de la goûter rapidement."],
+         ["lk_rare","Cette boisson me paraît difficile à trouver."]]
+        .map(([n, l]) => `<div class="q"><span class="title">${l}</span>${radios(n, LIKERT, "likert")}</div>`).join("")}`,
+    check: () => ["lk_originale","lk_qualite","lk_envie","lk_rare"].every(val) ? null : "Merci de répondre à chaque phrase.",
+    save: () => { ["lk_originale","lk_qualite","lk_envie","lk_rare"].forEach(k => data[k] = Number(val(k))); },
+  },
+  { // 7. Profil
+    html: () => `<h2>Pour finir, quelques questions sur vous</h2>
+      <div class="q"><span class="title">Votre âge</span>${radios("age", [["18-21","18 à 21 ans"],["22-25","22 à 25 ans"],["26-35","26 à 35 ans"],["36+","36 ans et plus"]])}</div>
+      <div class="q"><span class="title">Vous êtes</span>${radios("genre", [["femme","Une femme"],["homme","Un homme"],["autre","Autre / je préfère ne pas répondre"]])}</div>
+      <div class="q"><span class="title">Votre situation</span>${radios("situation", [["etudiant","Étudiant(e)"],["salarie","En emploi"],["autre","Autre"]])}</div>
+      <div class="q"><span class="title">À quelle fréquence buvez-vous des boissons énergisantes ?</span>
+      ${radios("frequence", [["<1/mois","Moins d'une fois par mois"],["1-3/mois","1 à 3 fois par mois"],["1-3/sem","1 à 3 fois par semaine"],["4+/sem","4 fois par semaine ou plus"]])}</div>`,
+    check: () => ["age","genre","situation","frequence"].every(val) ? null : "Merci de répondre à chaque question.",
+    save: () => { ["age","genre","situation","frequence"].forEach(k => data[k] = val(k)); data.statut = "complet"; },
+  },
+];
+
+// --- Moteur ---
+let i = 0;
+const app = document.getElementById("app");
+function render() {
+  document.getElementById("bar").style.width = (i / steps.length * 100) + "%";
+  app.innerHTML = steps[i].html() + `<div class="error" id="err"></div><button id="next">Suivant</button>`;
+  document.getElementById("next").onclick = next;
+  window.scrollTo(0, 0);
+}
+function next() {
+  const err = steps[i].check();
+  if (err !== null) { document.getElementById("err").textContent = err; return; }
+  const stop = steps[i].save();
+  if (stop) { data.statut = stop; return finish(); }
+  if (++i < steps.length) render(); else finish();
+}
+function finish() {
+  data.duree_sec = Math.round((Date.now() - start) / 1000);
+  document.getElementById("bar").style.width = "100%";
+  const msg = data.statut === "complet"
+    ? "Vos réponses ont bien été enregistrées. Merci beaucoup pour votre participation !"
+    : data.statut === "refus" ? "Pas de souci, merci d'avoir pris le temps d'ouvrir ce questionnaire."
+    : "Merci ! Ce questionnaire s'adresse à des personnes majeures qui consomment des boissons énergisantes, il s'arrête donc ici pour vous.";
+  app.innerHTML = `<h1>Merci</h1><p>${msg}</p>`;
+  if (ENDPOINT.startsWith("http")) {
+    fetch(ENDPOINT, { method: "POST", mode: "no-cors", body: JSON.stringify(data) }).catch(() => {});
+  } else {
+    console.log("Pas d'ENDPOINT configuré, réponse non envoyée :", data);
+  }
+  try { sessionStorage.removeItem("version"); } catch (e) {}
+}
+render();
+</script>
+</body>
+</html>
