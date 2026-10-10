@@ -89,11 +89,11 @@ const data = {
 };
 const start = Date.now();
 
-// --- L'offre : même texte en A et en B ; seule l'affiche change (A : « Winter Edition » + bandeau « Édition limitée », B : « Apple Edition ») ---
+// --- L'offre : même texte en A et en B ; seule l'affiche change (« Winter Edition » dans les deux ; A porte en plus le bandeau « Édition limitée ») ---
 function offerHtml() {
   return `<div class="offer">
-      <div class="visual"><img src="canette-${version.toLowerCase()}.jpg" alt="Canette Red Bull Sugarfree, goût pomme d'amour"></div>
-      <p><strong>Red Bull Sugarfree, goût pomme d'amour</strong></p>
+      <div class="visual"><img src="canette-${version.toLowerCase()}.jpg" alt="Canette Red Bull Winter Edition Sugarfree, goût pomme d'amour"></div>
+      <p><strong>Red Bull Winter Edition Sugarfree, goût pomme d'amour</strong></p>
       <ul>
         <li>Canette de 25 cl</li>
         <li>Sans sucres</li>
