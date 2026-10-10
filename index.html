@@ -44,11 +44,9 @@
 
   /* La présentation de l'offre : la bande d'icônes du bas de l'affiche est masquée */
   .offer { margin: 8px 0 16px; }
-  .visual { aspect-ratio: 673 / 870; overflow: hidden; border-radius: 12px; max-width: 360px; margin: 0 auto 12px; }
+  .visual { aspect-ratio: 740 / 935; overflow: hidden; border-radius: 12px; max-width: 360px; margin: 0 auto 12px; }
   .visual img { width: 100%; display: block; }
   .offer ul { margin: 0; padding-left: 18px; }
-  .limited { background: var(--accent-2); color: #fff; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; text-align: center; }
-  .limited strong { display: block; letter-spacing: .06em; }
   @media (max-width: 480px) {
     .gg { flex-direction: column; align-items: flex-start; }
   }
@@ -91,15 +89,11 @@ const data = {
 };
 const start = Date.now();
 
-// --- L'offre : A et B identiques, sauf le bandeau « édition limitée » ---
+// --- L'offre : même texte en A et en B ; seule l'affiche change (A : « Winter Edition » + bandeau « Édition limitée », B : « Apple Edition ») ---
 function offerHtml() {
-  const limited = version === "A"
-    ? `<div class="limited"><strong>ÉDITION LIMITÉE</strong>Disponible uniquement cet hiver, en quantité limitée.</div>`
-    : "";
   return `<div class="offer">
-      <div class="visual"><img src="canette.jpg" alt="Canette Red Bull Winter Edition Sugarfree, goût pomme d'amour"></div>
-      ${limited}
-      <p><strong>Red Bull Winter Edition Sugarfree, goût pomme d'amour</strong></p>
+      <div class="visual"><img src="canette-${version.toLowerCase()}.jpg" alt="Canette Red Bull Sugarfree, goût pomme d'amour"></div>
+      <p><strong>Red Bull Sugarfree, goût pomme d'amour</strong></p>
       <ul>
         <li>Canette de 25 cl</li>
         <li>Sans sucres</li>
@@ -138,9 +132,9 @@ const LK_PAGE_1 = [
 ];
 // Page 2 : adaptées de Dodds, Monroe & Grewal (1991)
 const LK_PAGE_2 = [
-  ["val_1", "Pour ce qu'elle offre, cette boisson vaut son prix."],                // valeur perçue
+  ["val_1", "Cette boisson vaut la peine d'être achetée."],                // valeur perçue
   ["val_2", "Acheter cette boisson serait une bonne affaire."],
-  ["val_3", "Ce que j'obtiens avec cette boisson vaut ce que je paierais."],
+  ["val_3", "Cette boisson m'apporterait plus qu'une boisson énergisante classique."],
   ["qual_1", "Cette boisson me paraît de bonne qualité."],                          // qualité perçue (1 item)
   ["int_1", "Je serais prêt(e) à acheter cette boisson."],                          // intention d'achat
   ["int_2", "Il est probable que j'achète cette boisson."],
